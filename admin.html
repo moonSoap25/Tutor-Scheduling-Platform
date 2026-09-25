@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; display: flex; justify-content: center; padding: 2rem; }
+    .container { width: 100%; max-width: 700px; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+    .card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 16px; }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .stat { background: #f9f9f9; border-radius: 10px; padding: 1rem; text-align: center; }
+    .stat-num { font-size: 28px; font-weight: 600; }
+    .stat-lbl { font-size: 12px; color: #888; margin-top: 2px; }
+    .stat-num.green { color: #0f6e56; }
+    .stat-num.red { color: #a32d2d; }
+    .stat-num.blue { color: #185fa5; }
+    .btn { padding: 12px 24px; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; width: 100%; }
+    .btn-purple { background: #3c3489; }
+    .btn-purple:hover { background: #2e2870; }
+    .btn-green { background: #0f6e56; margin-top: 12px; }
+    .btn-green:hover { background: #085041; }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
+    .match-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; flex-wrap: wrap; gap: 6px; }
+    .match-row:last-child { border-bottom: none; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+    .badge-teal { background: #e1f5ee; color: #085041; }
+    .badge-amber { background: #faeeda; color: #633806; }
+    .names { display: flex; align-items: center; gap: 8px; }
+    .arrow { color: #ccc; }
+    .empty { text-align: center; color: #aaa; font-size: 14px; padding: 1rem 0; }
+    .status { font-size: 13px; color: #666; margin-top: 12px; text-align: center; min-height: 20px; }
+    .success-banner { background: #e1f5ee; border-radius: 8px; padding: 12px 16px; font-size: 13px; color: #085041; margin-top: 12px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Admin panel</h1>
+    <p class="subtitle">View this week's matches and send confirmation emails.</p>
+
+    <div class="stats" id="stats" style="display:none">
+      <div class="stat">
+        <div class="stat-num blue" id="stat-students">—</div>
+        <div class="stat-lbl">Students signed up</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num green" id="stat-matched">—</div>
+        <div class="stat-lbl">Sessions matched</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num red" id="stat-unmatched">—</div>
+        <div class="stat-lbl">Unmatched requests</div>
+      </div>
+    </div>
+
+    <!-- Show matches button -->
+    <div class="card">
+      <h2>This week's matches</h2>
+      <p style="font-size:13px;color:#666;margin-bottom:16px">Load all matches made so far this week. You can edit them directly in the Matches sheet and hit refresh to see your changes here.</p>
+      <button class="btn btn-purple" id="show-btn" onclick="showMatches()">Show matches</button>
+      <p class="status" id="show-status"></p>
+    </div>
+
+    <!-- Match results -->
+    <div class="card" id="matched-card" style="display:none">
+      <h2 style="margin-bottom:12px">Matched sessions</h2>
+      <div id="matched-list"></div>
+
+      <!-- Send emails -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f0f0f0">
+        <p style="font-size:13px;color:#666;margin-bottom:4px">Happy with the matches? Send confirmation emails to all students, parents, and tutors.</p>
+        <button class="btn btn-green" id="email-btn" onclick="sendEmails()">Send confirmation emails</button>
+        <div class="success-banner" id="email-success"></div>
+        <p class="status" id="email-status"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      loadStats();
+    };
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function loadStats() {
+      google.script.run
+        .withSuccessHandler(function(data) {
+          document.getElementById('stats').style.display = 'grid';
+          document.getElementById('stat-students').textContent = data.studentCount;
+          document.getElementById('stat-matched').textContent = data.matchCount;
+          document.getElementById('stat-unmatched').textContent = data.unmatchedCount;
+        })
+        .getAdminStats();
+    }
+
+    function showMatches() {
+      const btn = document.getElementById('show-btn');
+      const status = document.getElementById('show-status');
+      const emailBtn = document.getElementById('email-btn');
+      const emailSuccess = document.getElementById('email-success');
+
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      status.textContent = 'Fetching this week\'s matches...';
+
+      // Reset email button state on refresh
+      emailBtn.disabled = false;
+      emailBtn.textContent = 'Send confirmation emails';
+      emailSuccess.style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          btn.disabled = false;
+          btn.textContent = 'Refresh matches';
+          status.textContent = '';
+          renderMatches(result.matched);
+          document.getElementById('matched-card').style.display = 'block';
+          loadStats(); // Refresh header stats as well
+        })
+        .withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = 'Show matches';
+          status.textContent = 'Something went wrong. Check Apps Script logs.';
+        })
+        .getCurrentMatches();
+    }
+
+    function renderMatches(matched) {
+      const list = document.getElementById('matched-list');
+
+      if (!matched || !matched.length) {
+        list.innerHTML = '<p class="empty">No matches this week yet.</p>';
+        return;
+      }
+
+      list.innerHTML = matched.map(m => `
+        <div class="match-row">
+          <div class="names">
+            <span>${escapeHtml(m.studentName)}</span>
+            <span class="arrow">→</span>
+            <span>${escapeHtml(m.tutorName)}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <span class="badge badge-teal">${escapeHtml(m.subject)}</span>
+            <span class="badge badge-amber">${escapeHtml(m.bestTime)}</span>
+          </div>
+        </div>`).join('');
+    }
+
+    function sendEmails() {
+      const btn = document.getElementById('email-btn');
+      const status = document.getElementById('email-status');
+      const success = document.getElementById('email-success');
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      status.textContent = 'Sending emails to students, parents, and tutors...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          btn.disabled = true;
+          btn.textContent = 'Emails sent ✓';
+          status.textContent = '';
+          success.textContent = `✓ Confirmation emails sent for ${result.count} session${result.count !== 1 ? 's' : ''}.`;
+          success.style.display = 'block';
+        })
+        .withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = 'Send confirmation emails';
+          status.textContent = 'Something went wrong. Check Apps Script logs.';
+        })
+        .sendAllMatchEmails();
+    }
+  </script>
+</body>
+</html>
