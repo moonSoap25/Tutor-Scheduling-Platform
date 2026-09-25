@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; display: flex; justify-content: center; padding: 2rem; }
+    .form-card { background: white; border-radius: 12px; padding: 2rem; width: 100%; max-width: 600px; }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+    label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; margin-top: 16px; }
+    input, select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    input.invalid { border-color: #a32d2d; }
+    input.valid { border-color: #1d9e75; }
+    .chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .chip { padding: 6px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 13px; cursor: pointer; background: white; }
+    .chip.selected { background: #e8e4ff; border-color: #7f77dd; color: #3c3489; font-weight: 500; }
+    .btn { margin-top: 24px; width: 100%; padding: 10px; background: #3c3489; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    .btn:hover { background: #2e2870; }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary { background: none; border: 1px solid #ddd; color: #555; margin-top: 10px; }
+    .btn-secondary:hover { background: #f5f5f5; }
+    .success { display: none; text-align: center; padding: 2rem; }
+    .success h2 { color: #0f6e56; margin-bottom: 8px; }
+    .error { display: none; color: #a32d2d; font-size: 13px; margin-top: 12px; }
+    .field-error { font-size: 12px; color: #a32d2d; margin-top: 4px; display: none; }
+    .loading { text-align: center; padding: 2rem; color: #888; font-size: 14px; }
+    .divider { height: 1px; background: #eee; margin: 20px 0; }
+    .lookup-section { margin-bottom: 0; }
+    .profile-section { display: none; }
+    .tag { display: inline-block; font-size: 11px; background: #eeedfe; color: #3c3489; padding: 2px 8px; border-radius: 20px; margin-left: 8px; font-weight: 500; }
+    .sessions-section { margin-top: 28px; }
+    .sessions-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #333; }
+    .session-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; gap: 12px; flex-wrap: wrap; }
+    .session-row:last-child { border-bottom: none; }
+    .session-info { font-size: 13px; }
+    .session-info .student-name { font-weight: 500; color: #333; }
+    .session-info .session-meta { color: #888; font-size: 12px; margin-top: 2px; }
+    .session-status { font-size: 13px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; color: #333; }
+    .session-status.pending { border-color: #ddd; color: #888; }
+    .session-status.completed { border-color: #1d9e75; color: #085041; background: #e1f5ee; }
+    .session-status.canceled { border-color: #f7c1c1; color: #a32d2d; background: #fcebeb; }
+    .empty-sessions { font-size: 13px; color: #aaa; padding: 8px 0; }
+    .week-label { font-size: 11px; color: #aaa; margin-left: 6px; font-weight: 400; }
+    .sessions-loading { font-size: 13px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <div class="form-card">
+
+    <!-- Step 1: Email lookup -->
+    <div id="lookup-section" class="lookup-section">
+      <h1>Tutor profile</h1>
+      <p class="subtitle">Enter your email to load your profile and update your information.</p>
+
+      <label>Your email</label>
+      <input type="email" id="lookup-email" placeholder="you@school.edu" oninput="clearLookupError()">
+      <p class="field-error" id="err-lookup">No tutor found with that email. Please check and try again.</p>
+
+      <button class="btn" id="lookup-btn" onclick="lookupTutor()">Load my profile</button>
+      <p style="text-align:center;margin-top:16px;font-size:13px;color:#666">
+        New tutor? 
+        <a id="register-link" href="#" style="color:#3c3489;text-decoration:none;font-weight:500">Register here →</a>
+      </p>
+    </div>
+
+    <!-- Step 2: Edit profile -->
+    <div id="profile-section" class="profile-section">
+      <h1>Edit your profile <span class="tag" id="tutor-name-tag"></span></h1>
+      <p class="subtitle">Update your information below and hit save when you're done.</p>
+
+      <label>Full name</label>
+      <input type="text" id="name" placeholder="e.g. Alex Kim">
+      <p class="field-error" id="err-name">Please enter your name.</p>
+
+      <label>Grade</label>
+      <select id="grade">
+        <option value="">Select your grade</option>
+        <option>5</option><option>6</option><option>7</option><option>8</option>
+        <option>9</option><option>10</option><option>11</option><option>12</option>
+      </select>
+      <p class="field-error" id="err-grade">Please select your grade.</p>
+
+      <label>Email</label>
+      <input type="email" id="email" placeholder="you@school.edu">
+      <p class="field-error" id="err-email">Please enter a valid email.</p>
+
+      <label>Subjects you can tutor</label>
+      <div class="chip-group" id="subjects">
+        <div class="chip" onclick="toggle(this)">Math</div>
+        <div class="chip" onclick="toggle(this)">English</div>
+        <div class="chip" onclick="toggle(this)">Science</div>
+        <div class="chip" onclick="toggle(this)">History</div>
+        <div class="chip" onclick="toggle(this)">Spanish</div>
+        <div class="chip" onclick="toggle(this)">French</div>
+        <div class="chip" onclick="toggle(this)">Chemistry</div>
+        <div class="chip" onclick="toggle(this)">Biology</div>
+        <div class="chip" onclick="toggle(this)">Physics</div>
+      </div>
+      <p class="field-error" id="err-subjects">Please select at least one subject.</p>
+
+      <label>Available timings</label>
+      <div class="chip-group" id="times">
+        <div class="chip" onclick="toggle(this)">Mon 3–4pm</div>
+        <div class="chip" onclick="toggle(this)">Mon 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Tue 3–4pm</div>
+        <div class="chip" onclick="toggle(this)">Tue 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Wed 3–4pm</div>
+        <div class="chip" onclick="toggle(this)">Wed 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Thu 3–4pm</div>
+        <div class="chip" onclick="toggle(this)">Thu 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Fri 3–4pm</div>
+        <div class="chip" onclick="toggle(this)">Fri 4–5pm</div>
+      </div>
+      <p class="field-error" id="err-times">Please select at least one timing.</p>
+
+      <p class="error" id="error">Please fix the errors above.</p>
+      <button class="btn" id="save-btn" onclick="saveProfile()">Save changes</button>
+      <button class="btn btn-secondary" onclick="resetToLookup()">Back to login</button>
+
+      <!-- Sessions -->
+      <div class="sessions-section">
+        <div class="divider"></div>
+        <p class="sessions-loading" id="sessions-loading">Loading your sessions...</p>
+
+        <div id="sessions-content" style="display:none">
+          <h3>This week's sessions <span class="week-label" id="this-week-label"></span></h3>
+          <div id="this-week-list"></div>
+
+          <div style="margin-top:20px">
+            <h3>All sessions</h3>
+            <div id="all-sessions-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success -->
+    <div class="success" id="success-view">
+      <h2>Profile updated!</h2>
+      <p style="color:#555;font-size:14px;margin-bottom:16px">Your information has been saved successfully.</p>
+      <button class="btn" onclick="resetToLookup()" style="margin-top:0">Back to home page</button>
+    </div>
+
+  </div>
+
+  <script>
+    let currentRowIndex = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      google.script.url.get(function(location) {
+        document.getElementById('register-link').href = location.baseUrl + '?page=tutor';
+      });
+    });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function clearLookupError() {
+      document.getElementById('err-lookup').style.display = 'none';
+    }
+
+    function lookupTutor() {
+      const email = document.getElementById('lookup-email').value.trim();
+      if (!email) {
+        document.getElementById('err-lookup').textContent = 'Please enter your email.';
+        document.getElementById('err-lookup').style.display = 'block';
+        return;
+      }
+
+      const btn = document.getElementById('lookup-btn');
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+
+      google.script.run
+        .withSuccessHandler(function(tutor) {
+          btn.disabled = false;
+          btn.textContent = 'Load my profile';
+
+          if (!tutor) {
+            document.getElementById('err-lookup').textContent = 'No tutor found with that email. Please check and try again.';
+            document.getElementById('err-lookup').style.display = 'block';
+            return;
+          }
+
+          populateProfile(tutor);
+        })
+        .withFailureHandler(function() {
+          btn.disabled = false;
+          btn.textContent = 'Load my profile';
+          document.getElementById('err-lookup').textContent = 'Something went wrong. Please try again.';
+          document.getElementById('err-lookup').style.display = 'block';
+        })
+        .getTutorByEmail(email);
+    }
+
+    function populateProfile(tutor) {
+      currentRowIndex = tutor.rowIndex;
+
+      document.getElementById('tutor-name-tag').textContent = tutor.name;
+      document.getElementById('name').value = tutor.name;
+      document.getElementById('grade').value = tutor.grade;
+      document.getElementById('email').value = tutor.email;
+
+      document.querySelectorAll('#subjects .chip').forEach(chip => {
+        chip.classList.toggle('selected', tutor.subjects.includes(chip.textContent.trim()));
+      });
+
+      document.querySelectorAll('#times .chip').forEach(chip => {
+        chip.classList.toggle('selected', tutor.times.includes(chip.textContent.trim()));
+      });
+
+      document.getElementById('lookup-section').style.display = 'none';
+      document.getElementById('profile-section').style.display = 'block';
+
+      loadTutorSessions(tutor.email);
+    }
+
+    function toggle(el) {
+      el.classList.toggle('selected');
+    }
+
+    function getSelected(groupId) {
+      return [...document.querySelectorAll('#' + groupId + ' .chip.selected')]
+        .map(c => c.textContent.trim());
+    }
+
+    function saveProfile() {
+      const name = document.getElementById('name').value.trim();
+      const grade = document.getElementById('grade').value;
+      const email = document.getElementById('email').value.trim();
+      const subjects = getSelected('subjects');
+      const times = getSelected('times');
+      let valid = true;
+
+      if (!name) { document.getElementById('err-name').style.display = 'block'; valid = false; }
+      else { document.getElementById('err-name').style.display = 'none'; }
+
+      if (!grade) { document.getElementById('err-grade').style.display = 'block'; valid = false; }
+      else { document.getElementById('err-grade').style.display = 'none'; }
+
+      if (!email) { document.getElementById('err-email').style.display = 'block'; valid = false; }
+      else { document.getElementById('err-email').style.display = 'none'; }
+
+      if (!subjects.length) { document.getElementById('err-subjects').style.display = 'block'; valid = false; }
+      else { document.getElementById('err-subjects').style.display = 'none'; }
+
+      if (!times.length) { document.getElementById('err-times').style.display = 'block'; valid = false; }
+      else { document.getElementById('err-times').style.display = 'none'; }
+
+      if (!valid) return;
+
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      google.script.run
+        .withSuccessHandler(() => {
+          document.getElementById('profile-section').style.display = 'none';
+          document.getElementById('success-view').style.display = 'block';
+        })
+        .withFailureHandler(() => {
+          document.getElementById('error').textContent = 'Something went wrong. Please try again.';
+          document.getElementById('error').style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Save changes';
+        })
+        .updateTutor({ rowIndex: currentRowIndex, name, grade: parseInt(grade), email, subjects, times });
+    }
+
+    function resetToLookup() {
+      currentRowIndex = null;
+      document.getElementById('lookup-email').value = '';
+      document.getElementById('lookup-section').style.display = 'block';
+      document.getElementById('profile-section').style.display = 'none';
+      document.getElementById('success-view').style.display = 'none';
+      document.getElementById('err-lookup').style.display = 'none';
+    }
+
+    function loadTutorSessions(email) {
+      document.getElementById('sessions-loading').style.display = 'block';
+      document.getElementById('sessions-content').style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(function(sessions) {
+          document.getElementById('sessions-loading').style.display = 'none';
+          document.getElementById('sessions-content').style.display = 'block';
+          renderSessions(sessions);
+        })
+        .withFailureHandler(function() {
+          document.getElementById('sessions-loading').textContent = 'Failed to load sessions.';
+        })
+        .getTutorSessions(email);
+    }
+
+    function renderSessions(sessions) {
+      const thisWeek = sessions.filter(s => s.isThisWeek);
+      const allSessions = sessions;
+
+      if (thisWeek.length) {
+        document.getElementById('this-week-label').textContent = escapeHtml(thisWeek[0].weekOf);
+      }
+
+      const thisWeekEl = document.getElementById('this-week-list');
+      if (!thisWeek.length) {
+        thisWeekEl.innerHTML = '<p class="empty-sessions">No sessions this week yet.</p>';
+      } else {
+        thisWeekEl.innerHTML = thisWeek.map(s => sessionRow(s)).join('');
+      }
+
+      const allEl = document.getElementById('all-sessions-list');
+      if (!allSessions.length) {
+        allEl.innerHTML = '<p class="empty-sessions">No sessions found.</p>';
+      } else {
+        allEl.innerHTML = allSessions.map(s => sessionRow(s)).join('');
+      }
+    }
+
+    function sessionRow(s) {
+      const statusClass = s.status === 'Session completed' ? 'completed'
+        : s.status === 'Pending' ? 'pending' : 'canceled';
+
+      return `
+        <div class="session-row">
+          <div class="session-info">
+            <div class="student-name">${escapeHtml(s.studentName)}</div>
+            <div class="session-meta">${escapeHtml(s.subject)} · ${escapeHtml(s.time)} · ${escapeHtml(s.weekOf)}</div>
+          </div>
+          <select class="session-status ${statusClass}" onchange="updateStatus(this, ${s.rowIndex})">
+            <option ${s.status === 'Pending' ? 'selected' : ''}>Pending</option>
+            <option ${s.status === 'Session completed' ? 'selected' : ''}>Session completed</option>
+            <option ${s.status === 'I canceled' ? 'selected' : ''}>I canceled</option>
+            <option ${s.status === 'Student canceled' ? 'selected' : ''}>Student canceled</option>
+          </select>
+        </div>`;
+    }
+
+    function updateStatus(selectEl, rowIndex) {
+      const status = selectEl.value;
+
+      selectEl.className = 'session-status';
+      if (status === 'Session completed') selectEl.classList.add('completed');
+      else if (status === 'Pending') selectEl.classList.add('pending');
+      else selectEl.classList.add('canceled');
+
+      google.script.run
+        .withSuccessHandler(function() {
+          // silent success
+        })
+        .withFailureHandler(function() {
+          alert('Failed to save status. Please try again.');
+        })
+        .updateSessionStatus(rowIndex, status);
+    }
+  </script>
+</body>
+</html>
