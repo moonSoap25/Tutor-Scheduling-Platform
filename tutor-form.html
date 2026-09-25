@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; display: flex; justify-content: center; padding: 2rem; }
+    .form-card { background: white; border-radius: 12px; padding: 2rem; width: 100%; max-width: 600px; }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+    label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; margin-top: 16px; }
+    input, select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .chip { padding: 6px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 13px; cursor: pointer; background: white; }
+    .chip.selected { background: #e8e4ff; border-color: #7f77dd; color: #3c3489; font-weight: 500; }
+    .btn { margin-top: 24px; width: 100%; padding: 10px; background: #3c3489; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    .btn:hover { background: #2e2870; }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
+    .success { display: none; text-align: center; padding: 2rem; }
+    .success h2 { color: #0f6e56; margin-bottom: 8px; }
+    .error { display: none; color: #a32d2d; font-size: 13px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="form-card">
+    <div id="form-view">
+      <h1>Tutor Registration</h1>
+      <p class="subtitle">Fill this out once. Come back to update your availability anytime.</p>
+
+      <label>Full name</label>
+      <input type="text" id="name" placeholder="e.g. Alex Kim">
+
+      <label>Grade</label>
+      <select id="grade">
+        <option value="">Select your grade</option>
+        <option>9</option><option>10</option><option>11</option><option>12</option>
+      </select>
+
+      <label>Email</label>
+      <input type="email" id="email" placeholder="you@school.edu">
+
+      <label>Subjects you can tutor</label>
+      <div class="chip-group" id="subjects">
+        <div class="chip" onclick="toggle(this)">Math</div>
+        <div class="chip" onclick="toggle(this)">English</div>
+        <div class="chip" onclick="toggle(this)">Science</div>
+        <div class="chip" onclick="toggle(this)">History</div>
+        <div class="chip" onclick="toggle(this)">Spanish</div>
+        <div class="chip" onclick="toggle(this)">French</div>
+        <div class="chip" onclick="toggle(this)">Chemistry</div>
+        <div class="chip" onclick="toggle(this)">Biology</div>
+        <div class="chip" onclick="toggle(this)">Physics</div>
+      </div>
+
+      <label>Your available timings</label>
+      <div class="chip-group" id="times">
+        <div class="chip" onclick="toggle(this)">Mon 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Mon 5–6pm</div>
+        <div class="chip" onclick="toggle(this)">Tue 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Tue 5–6pm</div>
+        <div class="chip" onclick="toggle(this)">Wed 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Wed 5–6pm</div>
+        <div class="chip" onclick="toggle(this)">Thu 4–5pm</div>
+        <div class="chip" onclick="toggle(this)">Thu 5–6pm</div>
+      </div>
+
+      <p class="error" id="error">Please fill in all fields and select at least one subject and timing.</p>
+      <button class="btn" id="submit-btn" onclick="submitForm()">Register as tutor</button>
+      <p style="text-align:center;margin-top:16px;font-size:13px;color:#666">
+        Already registered? 
+        <a id="profile-link" href="#" style="color:#3c3489;text-decoration:none;font-weight:500">View your profile →</a>
+      </p>
+    </div>
+
+    <div class="success" id="success-view">
+      <h2>You're registered!</h2>
+      <p style="color:#555;font-size:14px">Your information has been saved. You'll be notified when you're matched with a student.</p>
+    </div>
+  </div>
+
+  <script>
+    // Set dynamic navigation link on load
+    window.addEventListener('DOMContentLoaded', () => {
+      google.script.url.get(function(location) {
+        document.getElementById('profile-link').href = location.baseUrl + '?page=tutor-profile';
+      });
+    });
+
+    function toggle(el) {
+      el.classList.toggle('selected');
+    }
+
+    function getSelected(groupId) {
+      return [...document.querySelectorAll('#' + groupId + ' .chip.selected')]
+        .map(c => c.textContent.trim());
+    }
+
+    function submitForm() {
+      const name = document.getElementById('name').value.trim();
+      const grade = document.getElementById('grade').value;
+      const email = document.getElementById('email').value.trim();
+      const subjects = getSelected('subjects');
+      const times = getSelected('times');
+      const err = document.getElementById('error');
+
+      // Reset default error text
+      err.textContent = 'Please fill in all fields and select at least one subject and timing.';
+
+      if (!name || !grade || !email || !subjects.length || !times.length) {
+        err.style.display = 'block';
+        return;
+      }
+
+      err.style.display = 'none';
+      document.getElementById('submit-btn').disabled = true;
+      document.getElementById('submit-btn').textContent = 'Saving...';
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          if (result && result.success) {
+            document.getElementById('form-view').style.display = 'none';
+            document.getElementById('success-view').style.display = 'block';
+          } else {
+            err.textContent = result ? result.message : 'Registration failed.';
+            err.style.display = 'block';
+            document.getElementById('submit-btn').disabled = false;
+            document.getElementById('submit-btn').textContent = 'Register as tutor';
+          }
+        })
+        .withFailureHandler(() => {
+          err.textContent = 'Something went wrong. Please try again.';
+          err.style.display = 'block';
+          document.getElementById('submit-btn').disabled = false;
+          document.getElementById('submit-btn').textContent = 'Register as tutor';
+        })
+        .saveTutor({ name, grade: parseInt(grade), email, subjects, times });
+    }
+  </script>
+</body>
+</html>
