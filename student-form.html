@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: #f5f5f5; display: flex; justify-content: center; padding: 2rem; }
+    .form-card { background: white; border-radius: 12px; padding: 2rem; width: 100%; max-width: 600px; }
+    h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+    label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; margin-top: 16px; }
+    input, select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    input.invalid { border-color: #a32d2d; }
+    input.valid { border-color: #1d9e75; }
+    .field-error { font-size: 12px; color: #a32d2d; margin-top: 4px; display: none; }
+    .divider { height: 1px; background: #eee; margin: 24px 0; }
+    .session-block { background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 1rem; margin-bottom: 12px; position: relative; }
+    .session-title { font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #333; }
+    .remove-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #aaa; font-size: 18px; cursor: pointer; line-height: 1; }
+    .remove-btn:hover { color: #a32d2d; }
+    .chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .chip { padding: 6px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 13px; cursor: pointer; background: white; transition: all 0.15s; }
+    .chip.selected { background: #e1f5ee; border-color: #1d9e75; color: #085041; font-weight: 500; }
+    .chip:hover:not(.selected) { background: #f5f5f5; }
+    .times-loading { font-size: 13px; color: #aaa; margin-top: 8px; display: none; }
+    .add-session-btn { width: 100%; padding: 10px; background: none; border: 1px dashed #ddd; border-radius: 8px; font-size: 14px; color: #888; cursor: pointer; margin-top: 4px; }
+    .add-session-btn:hover { border-color: #1d9e75; color: #1d9e75; }
+    .btn { margin-top: 24px; width: 100%; padding: 10px; background: #085041; color: white; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    .btn:hover { background: #0f6e56; }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
+    .success { display: none; text-align: center; padding: 2rem; }
+    .success h2 { color: #0f6e56; margin-bottom: 8px; }
+    .match-details { background: #f0faf5; border-radius: 10px; padding: 1rem; margin: 16px 0; text-align: left; }
+    .match-details p { font-size: 13px; color: #333; margin-bottom: 6px; }
+    .match-details p:last-child { margin-bottom: 0; }
+    .match-details strong { color: #085041; }
+    .error { display: none; color: #a32d2d; font-size: 13px; margin-top: 12px; }
+    .loading { text-align: center; padding: 2rem; color: #888; font-size: 14px; }
+    .no-slots { font-size: 13px; color: #a32d2d; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="form-card">
+    <div id="loading-view" class="loading">Loading available subjects...</div>
+
+    <div id="form-view" style="display:none">
+      <h1>Sign up for tutoring</h1>
+      <p class="subtitle">Sign-ups reset every Sunday. You can request multiple sessions below.</p>
+
+      <label>Full name</label>
+      <input type="text" id="name" placeholder="e.g. Jordan Lee">
+      <p class="field-error" id="err-name">Please enter your name.</p>
+
+      <label>Grade</label>
+      <select id="grade">
+        <option value="">Select your grade</option>
+        <option>5</option><option>6</option><option>7</option><option>8</option>
+        <option>9</option><option>10</option><option>11</option><option>12</option>
+      </select>
+      <p class="field-error" id="err-grade">Please select your grade.</p>
+
+      <label>Your email</label>
+      <input type="email" id="email" placeholder="you@school.edu" oninput="validateEmail('email', 'err-email')">
+      <p class="field-error" id="err-email">Please enter a valid email address.</p>
+
+      <label>Parent email</label>
+      <input type="email" id="parent-email" placeholder="parent@email.com" oninput="validateEmail('parent-email', 'err-parent-email')">
+      <p class="field-error" id="err-parent-email">Please enter a valid parent email address.</p>
+
+      <div class="divider"></div>
+
+      <p style="font-size:14px;font-weight:500;margin-bottom:12px">Session requests</p>
+      <div id="session-list"></div>
+      <button class="add-session-btn" id="add-session-btn" onclick="addSession()">+ Add another session</button>
+
+      <p class="error" id="error">Please fix the errors above before submitting.</p>
+      <button class="btn" id="submit-btn" onclick="submitForm()">Submit sign-up</button>
+    </div>
+
+    <div class="success" id="success-view">
+      <h2>You're signed up!</h2>
+      <p style="color:#555;font-size:14px;margin-bottom:16px">Here are your confirmed session(s):</p>
+      <div id="match-summary"></div>
+      <p style="color:#888;font-size:12px;margin-top:16px">A confirmation email will be sent to you and your parent shortly.</p>
+    </div>
+  </div>
+
+  <script>
+    let availableSubjects = [];
+    let sessionCount = 0;
+
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(function(subjects) {
+          availableSubjects = subjects;
+          document.getElementById('loading-view').style.display = 'none';
+          document.getElementById('form-view').style.display = 'block';
+          addSession();
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('loading-view').textContent = 'Failed to load. Please refresh the page.';
+        })
+        .getAvailableSubjects();
+    };
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function validateEmail(inputId, errId) {
+      const input = document.getElementById(inputId);
+      const err = document.getElementById(errId);
+      const val = input.value.trim();
+
+      if (val === '') {
+        input.classList.remove('valid', 'invalid');
+        err.style.display = 'none';
+        return false;
+      }
+
+      const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+      input.classList.toggle('valid', valid);
+      input.classList.toggle('invalid', !valid);
+      err.style.display = valid ? 'none' : 'block';
+      return valid;
+    }
+
+    function addSession() {
+      const id = sessionCount++;
+      const div = document.createElement('div');
+      div.className = 'session-block';
+      div.id = 'session-' + id;
+
+      const subjectOptions = availableSubjects.map(s =>
+        `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`
+      ).join('');
+
+      div.innerHTML = `
+        ${sessionCount > 1 ? `<button class="remove-btn" onclick="removeSession(${id})">×</button>` : ''}
+        <p class="session-title">Session</p>
+        <label>Subject</label>
+        <select id="subj-${id}" onchange="loadTimesForSession(${id})">
+          <option value="">Select a subject</option>
+          ${subjectOptions}
+        </select>
+        <p class="field-error" id="err-subj-${id}">Please select a subject.</p>
+        <div id="times-container-${id}" style="display:none">
+          <label>Available timeslot</label>
+          <p class="times-loading" id="times-loading-${id}">Loading available times...</p>
+          <div class="chip-group" id="times-${id}"></div>
+          <p class="no-slots" id="no-slots-${id}">No timeslots available for this subject.</p>
+          <p class="field-error" id="err-times-${id}">Please select a timeslot.</p>
+        </div>`;
+
+      document.getElementById('session-list').appendChild(div);
+    }
+
+    function loadTimesForSession(id) {
+      const subjectEl = document.getElementById('subj-' + id);
+      if (!subjectEl) return;
+      const subject = subjectEl.value;
+      const container = document.getElementById('times-container-' + id);
+      const loading = document.getElementById('times-loading-' + id);
+      const timesEl = document.getElementById('times-' + id);
+      const noSlots = document.getElementById('no-slots-' + id);
+
+      timesEl.innerHTML = '';
+      noSlots.style.display = 'none';
+      document.getElementById('err-subj-' + id).style.display = 'none';
+
+      if (!subject) {
+        container.style.display = 'none';
+        return;
+      }
+
+      container.style.display = 'block';
+      loading.style.display = 'block';
+
+      google.script.run
+        .withSuccessHandler(function(times) {
+          loading.style.display = 'none';
+
+          if (!times.length) {
+            noSlots.style.display = 'block';
+            return;
+          }
+
+          timesEl.innerHTML = times.map(t =>
+            `<div class="chip" onclick="selectTime(this, ${id})">${escapeHtml(t)}</div>`
+          ).join('');
+        })
+        .withFailureHandler(function() {
+          loading.style.display = 'none';
+          noSlots.textContent = 'Failed to load times. Please try again.';
+          noSlots.style.display = 'block';
+        })
+        .getTimesForSubject(subject);
+    }
+
+    function selectTime(el, sessionId) {
+      document.querySelectorAll('#times-' + sessionId + ' .chip')
+        .forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('err-times-' + sessionId).style.display = 'none';
+    }
+
+    function removeSession(id) {
+      const el = document.getElementById('session-' + id);
+      if (el) el.remove();
+    }
+
+    function getSelectedTime(sessionId) {
+      const selected = document.querySelector('#times-' + sessionId + ' .chip.selected');
+      return selected ? selected.textContent.trim() : null;
+    }
+
+    function submitForm() {
+      const name = document.getElementById('name').value.trim();
+      const grade = document.getElementById('grade').value;
+      const email = document.getElementById('email').value.trim();
+      const parentEmail = document.getElementById('parent-email').value.trim();
+      const err = document.getElementById('error');
+      let valid = true;
+
+      if (!name) { document.getElementById('err-name').style.display = 'block'; valid = false; }
+      else { document.getElementById('err-name').style.display = 'none'; }
+
+      if (!grade) { document.getElementById('err-grade').style.display = 'block'; valid = false; }
+      else { document.getElementById('err-grade').style.display = 'none'; }
+
+      if (!email || !validateEmail('email', 'err-email')) valid = false;
+
+      if (!parentEmail || !validateEmail('parent-email', 'err-parent-email')) {
+        document.getElementById('err-parent-email').style.display = 'block';
+        valid = false;
+      }
+
+      const sessionEls = [...document.getElementById('session-list').children];
+      const sessions = [];
+
+      sessionEls.forEach(el => {
+        const id = parseInt(el.id.replace('session-', ''), 10);
+        const subject = document.getElementById('subj-' + id).value;
+        const time = getSelectedTime(id);
+
+        if (!subject) {
+          document.getElementById('err-subj-' + id).style.display = 'block';
+          valid = false;
+        }
+        if (subject && !time) {
+          document.getElementById('err-times-' + id).style.display = 'block';
+          valid = false;
+        }
+        if (subject && time) sessions.push({ id, subject, time });
+      });
+
+      if (!sessions.length) {
+        err.textContent = 'Please add at least one session with a subject and timeslot selected.';
+        err.style.display = 'block';
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      err.style.display = 'none';
+      document.getElementById('submit-btn').disabled = true;
+      document.getElementById('submit-btn').textContent = 'Submitting...';
+
+      const studentData = { name, grade: parseInt(grade), email, parentEmail };
+
+      submitNextSession(studentData, sessions, 0, []);
+    }
+
+    function submitNextSession(studentData, sessions, index, results) {
+      if (index >= sessions.length) {
+        showSuccess(results);
+        return;
+      }
+
+      const session = sessions[index];
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            results.push(result);
+            submitNextSession(studentData, sessions, index + 1, results);
+          } else {
+            document.getElementById('submit-btn').disabled = false;
+            document.getElementById('submit-btn').textContent = 'Submit sign-up';
+            const err = document.getElementById('error');
+            err.textContent = result.message + ' (Session ' + (index + 1) + ': ' + session.subject + ')';
+            err.style.display = 'block';
+
+            loadTimesForSession(session.id);
+          }
+        })
+        .withFailureHandler(function() {
+          document.getElementById('submit-btn').disabled = false;
+          document.getElementById('submit-btn').textContent = 'Submit sign-up';
+          const err = document.getElementById('error');
+          err.textContent = 'Something went wrong. Please try again.';
+          err.style.display = 'block';
+        })
+        .submitStudentSession(studentData, session.subject, session.time);
+    }
+
+    function showSuccess(results) {
+      document.getElementById('form-view').style.display = 'none';
+      document.getElementById('success-view').style.display = 'block';
+
+      document.getElementById('match-summary').innerHTML = results.map(r => `
+        <div class="match-details">
+          <p><strong>Subject:</strong> ${escapeHtml(r.subject)}</p>
+          <p><strong>Tutor:</strong> ${escapeHtml(r.tutorName)}</p>
+          <p><strong>Time:</strong> ${escapeHtml(r.time)}</p>
+        </div>`).join('');
+    }
+  </script>
+</body>
+</html>
